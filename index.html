@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Shift Schedule Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: auto;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+        
+        input, select, button {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .shift-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .shift-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .shift-card:nth-child(2) {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .shift-card:nth-child(3) {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .schedule-table {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            table-layout: auto;
+        }
+        
+        th, td {
+            padding: 10px 6px;
+            text-align: center;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px;
+            word-break: break-word;
+        }
+        
+        th {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        tr:hover {
+            background: #f8fafc;
+            transform: scale(1.01);
+            transition: all 0.2s ease;
+        }
+        
+        .shift-1 { background: rgba(240, 147, 251, 0.2); }
+        .shift-2 { background: rgba(79, 172, 254, 0.2); }
+        .shift-3 { background: rgba(67, 233, 123, 0.2); }
+        .off { background: rgba(160, 174, 192, 0.2); }
+        
+        .employees {
+            margin-bottom: 20px;
+        }
+        
+        .employee-section {
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f8fafc;
+        }
+        
+        .employee-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        .employee-header input {
+            flex: 1;
+            font-weight: 600;
+        }
+        
+        .remove-btn {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        .add-employee {
+            background: #38a169;
+            margin-top: 10px;
+        }
+        
+        .off-days-section {
+            margin-top: 15px;
+        }
+        
+        .off-days-section h4 {
+            margin-bottom: 10px;
+            color: #4a5568;
+            font-size: 14px;
+        }
+        
+        .off-days-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .off-days-input input[type="date"] {
+            flex: 1;
+        }
+        
+        .remove-off-day {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .add-off-day {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .off-days-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 10px;
+            background: white;
+        }
+        
+        th:first-child, td:first-child {
+            white-space: nowrap;
+            width: 1%;
+        }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+    <!-- Add flatpickr CSS/JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="month">Month:</label>
+                <select id="month">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="year">Year:</label>
+                <input type="number" id="year" value="2025" min="2024" max="2030">
+            </div>
+                <button onclick="generateSchedule()">Generate Schedule</button>
+        </div>
+        <div id="loadingIndicator" style="display:none; text-align:center; margin:20px 0;">
+            <div class="spinner" style="display:inline-block; width:32px; height:32px; border:4px solid #ccc; border-top:4px solid #667eea; border-radius:50%; animation:spin 1s linear infinite;"></div>
+            <div style="font-size:16px; margin-top:8px;">Generating schedule, please wait...</div>
+        </div>
+        <div class="schedule-table">
+            <table id="scheduleTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="employeeList"></div>
+    </div>
+
+    <script>
+        // Add default employees
+        let defaultEmployees = [
+            { name: 'Dimas', offDays: [], leaves: [] },
+            { name: 'Jevon', offDays: [], leaves: [] },
+            { name: 'Arza', offDays: [], leaves: [] },
+            { name: 'Ihya', offDays: [], leaves: [] },
+            { name: 'Girin', offDays: [], leaves: [] }
+        ];
+
+        let indonesianHolidays = [];
+        async function fetchIndonesianHolidays(year) {
+            const apiKey = 'wgQIVG4UB8LJ3NlROy2YsWQRlaQt8530'; // Calendarific API key
+            const url = `https://calendarific.com/api/v2/holidays?&api_key=${apiKey}&country=ID&year=${year}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) return [];
+                const data = await response.json();
+                // Filter for public and joint holidays
+                return data.response.holidays
+                    .filter(h => h.type.includes('National holiday') || h.type.includes('Public holiday') || h.type.includes('Government holiday') || h.type.includes('Joint Holiday'))
+                    .map(h => ({
+                        date: h.date.iso.slice(0, 10),
+                        localName: h.name
+                    }));
+            } catch (e) {
+                return [];
+            }
+        }
+        function isPublicHoliday(dateString) {
+            return indonesianHolidays.some(h => h.date === dateString);
+        }
+        function getHolidayName(dateString) {
+            const h = indonesianHolidays.find(h => h.date === dateString);
+            return h ? h.localName : '';
+        }
+
+        // Set default month in the month selector to next month
+        const now = new Date();
+        const nextMonth = (now.getMonth() + 1) % 12;
+        document.getElementById('month').value = nextMonth;
+
+        function renderEmployeeForms() {
+            const employeeList = document.getElementById('employeeList');
+            employeeList.innerHTML = '';
+            defaultEmployees.forEach((emp, idx) => {
+            const div = document.createElement('div');
+            div.className = 'employee-section';
+                div.style.border = 'none';
+                div.style.background = 'none';
+                div.style.padding = '8px 0 0 0';
+                div.style.margin = '0 0 8px 0';
+            div.innerHTML = `
+                    <label style="font-weight:500; margin-bottom:2px; display:inline-block;">${emp.name}</label>
+                    <select class="last-shift-select" style="margin-left:8px; font-size:13px; padding:2px 8px;">
+                        <option value="Shift 1">Last: Shift 1</option>
+                        <option value="Shift 2">Last: Shift 2</option>
+                        <option value="Shift 3">Last: Shift 3</option>
+                        <option value="Off">Last: Off</option>
+                        <option value="Leave">Last: Leave</option>
+                    </select>
+                    <input type="text" class="off-days-multidate" placeholder="Days off" style="width:140px; font-size:13px; padding:4px 8px; margin-left:8px; margin-bottom:2px;" readonly>
+                    <input type="text" class="leave-range" placeholder="Leave (range)" style="width:140px; font-size:13px; padding:4px 8px; margin-left:8px; margin-bottom:2px;" readonly>
+                    <div class="requested-shifts-list" style="display:inline-block; margin-left:8px;"></div>
+                    <button class="add-requested-shift" onclick="addRequestedShift(this)" style="font-size:13px; padding:2px 8px; margin-left:4px;">+ Shift</button>
+                `;
+            employeeList.appendChild(div);
+                setTimeout(() => {
+                    flatpickr(div.querySelector('.off-days-multidate'), { mode: 'multiple' });
+                    flatpickr(div.querySelector('.leave-range'), {
+                        mode: 'range',
+                    });
+                }, 0);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', renderEmployeeForms);
+        
+        function addRequestedShift(button) {
+            const list = button.parentElement.querySelector('.requested-shifts-list');
+            const div = document.createElement('div');
+            div.className = 'requested-shift-input';
+            div.style.display = 'inline-block';
+            div.style.marginRight = '6px';
+            div.innerHTML = `
+                <input type="date" class="requested-shift-date" style="font-size:13px; padding:2px 4px; margin-right:2px;">
+                <select class="requested-shift-type" style="font-size:13px; padding:2px 4px; margin-right:2px;">
+                    <option value="Shift 1">S1</option>
+                    <option value="Shift 2">S2</option>
+                    <option value="Shift 3">S3</option>
+                </select>
+                <button class="remove-requested-shift" onclick="removeRequestedShift(this)" style="font-size:13px; padding:0 6px;">×</button>
+            `;
+            // Set default date to next month
+            const now = new Date();
+            const nextMonth = (now.getMonth() + 1) % 12;
+            const year = now.getFullYear() + (nextMonth === 0 ? 1 : 0);
+            div.querySelector('.requested-shift-date').value = `${year}-${String(nextMonth + 1).padStart(2, '0')}-01`;
+            list.appendChild(div);
+        }
+        
+        function removeRequestedShift(button) {
+                button.parentElement.remove();
+        }
+        
+        // Update getEmployeesWithOffDays to always use the forms rendered for defaultEmployees
+        function getEmployeesWithOffDays() {
+            const employeeSections = document.querySelectorAll('.employee-section');
+            if (employeeSections.length === 0) {
+                return JSON.parse(JSON.stringify(defaultEmployees));
+            }
+            const employees = [];
+            employeeSections.forEach(section => {
+                const nameLabel = section.querySelector('label');
+                const lastShiftSelect = section.querySelector('.last-shift-select');
+                const offDaysInput = section.querySelector('.off-days-multidate');
+                const leaveRangeInput = section.querySelector('.leave-range');
+                const requestedShiftInputs = section.querySelectorAll('.requested-shift-input');
+                const offDays = [];
+                if (offDaysInput && offDaysInput.value) {
+                    offDaysInput.value.split(',').forEach(date => {
+                        if (date) offDays.push({ date: date.trim(), type: 'full' });
+                    });
+                }
+                // Parse leave range
+                let leaves = [];
+                if (leaveRangeInput && leaveRangeInput.value) {
+                    const parts = leaveRangeInput.value.split(' to ');
+                    if (parts.length === 2) {
+                        leaves.push({ start: parts[0], end: parts[1] });
+                    }
+                }
+                const requestedShifts = [];
+                requestedShiftInputs.forEach(input => {
+                    const date = input.querySelector('.requested-shift-date').value;
+                    const shift = input.querySelector('.requested-shift-type').value;
+                    if (date && shift) {
+                        requestedShifts.push({ date, shift });
+                    }
+                });
+                employees.push({
+                    name: nameLabel ? nameLabel.textContent : 'Unnamed Employee',
+                    lastShift: lastShiftSelect ? lastShiftSelect.value : 'Off',
+                    offDays: offDays,
+                    requestedShifts: requestedShifts,
+                    leaves: leaves
+                });
+            });
+            return employees;
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toISOString().split('T')[0];
+        }
+        
+        function isOffDay(employee, dateString) {
+            const checkDate = formatDate(dateString);
+            
+            for (let offDay of employee.offDays) {
+                if (offDay.date === checkDate) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        function getDaysInMonth(month, year) {
+            return new Date(year, month + 1, 0).getDate();
+        }
+        
+        function isLeave(employee, dateString) {
+            for (let leave of (employee.leaves || [])) {
+                if (leave.start && leave.end && dateString >= leave.start && dateString <= leave.end) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Calculate number of weekdays in the month
+        function countWeekdaysInMonth(year, month) {
+            let count = 0;
+            const daysInMonth = getDaysInMonth(month, year);
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayOfWeek = new Date(year, month, d).getDay();
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) count++; // Monday=1, ..., Friday=5
+            }
+            return count;
+        }
+        
+        // Count number of public holidays that fall on weekdays in the month
+        function countWeekdayHolidaysInMonth(year, month, holidays) {
+            let count = 0;
+            holidays.forEach(h => {
+                const d = new Date(h.date);
+                if (d.getFullYear() === year && d.getMonth() === month) {
+                    const dayOfWeek = d.getDay();
+                    if (dayOfWeek >= 1 && dayOfWeek <= 5) count++; // Monday=1, ..., Friday=5
+                }
+            });
+            return count;
+        }
+        
+        function countLeaveDaysInMonth(employee, year, month) {
+            let leaveDays = 0;
+            (employee.leaves || []).forEach(leave => {
+                if (leave.start && leave.end) {
+                    let start = new Date(leave.start);
+                    let end = new Date(leave.end);
+                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                        if (d.getFullYear() === year && d.getMonth() === month) {
+                            const dayOfWeek = d.getDay();
+                            const dateStr = d.toISOString().slice(0, 10);
+                            if (dayOfWeek >= 1 && dayOfWeek <= 5 && !isPublicHoliday(dateStr)) {
+                                leaveDays++;
+                            }
+                        }
+                    }
+                }
+            });
+            return leaveDays;
+        }
+        
+        async function generateSchedule() {
+            document.getElementById('loadingIndicator').style.display = 'block';
+            document.getElementById('scheduleTable').style.display = 'none';
+
+            setTimeout(async () => {
+                const month = parseInt(document.getElementById('month').value);
+                const year = parseInt(document.getElementById('year').value);
+                indonesianHolidays = await fetchIndonesianHolidays(year);
+                const employees = getEmployeesWithOffDays();
+                const daysInMonth = getDaysInMonth(month, year);
+            const table = document.getElementById('scheduleTable');
+            const thead = table.querySelector('thead tr');
+            const tbody = table.querySelector('tbody');
+            thead.innerHTML = '<th>Employee</th>';
+            tbody.innerHTML = '';
+                const shiftTypes = [
+                    { name: 'Shift 1', class: 'shift-1' },
+                    { name: 'Shift 2', class: 'shift-2' },
+                    { name: 'Shift 3', class: 'shift-3' }
+                ];
+            // Add day headers
+            for (let day = 1; day <= daysInMonth; day++) {
+                const th = document.createElement('th');
+                    const dateObj = new Date(year, month, day);
+                    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                    const isHoliday = isPublicHoliday(dateString);
+                    th.innerHTML = `<div style="color:${isWeekend || isHoliday ? '#e53e3e' : '#4a5568'};font-weight:bold;" title="${isHoliday ? getHolidayName(dateString) : ''}">${dayOfWeek}</div><div>${day}</div>`;
+                    th.title = isHoliday ? getHolidayName(dateString) : '';
+                thead.appendChild(th);
+            }
+                shiftTypes.forEach(shift => {
+                    const th = document.createElement('th');
+                    th.textContent = shift.name + ' Total';
+                    th.style.minWidth = '40px';
+                    thead.appendChild(th);
+                });
+                const thTotalWorkdays = document.createElement('th');
+                thTotalWorkdays.textContent = 'Total Workdays';
+                thTotalWorkdays.style.minWidth = '40px';
+                thead.appendChild(thTotalWorkdays);
+                const thTotalOff = document.createElement('th');
+                thTotalOff.textContent = 'Total Off';
+                thTotalOff.style.minWidth = '40px';
+                thead.appendChild(thTotalOff);
+                const thMinWorkdays = document.createElement('th');
+                thMinWorkdays.textContent = 'Min Workdays';
+                thMinWorkdays.style.minWidth = '40px';
+                thead.appendChild(thMinWorkdays);
+                const thMaxWorkdays = document.createElement('th');
+                thMaxWorkdays.textContent = 'Max Workdays';
+                thMaxWorkdays.style.minWidth = '40px';
+                thead.appendChild(thMaxWorkdays);
+
+                // Try to generate a valid schedule up to 100000 times
+                let maxAttempts = 100000;
+                let validSchedule = false;
+                let scheduleMatrix;
+                let prevShifts = employees.map(emp => emp.lastShift || null);
+                let shiftCounts;
+                while (!validSchedule && maxAttempts-- > 0) {
+                    scheduleMatrix = Array.from({ length: employees.length }, () => Array(daysInMonth).fill(''));
+                    shiftCounts = Array.from({ length: employees.length }, () => ({ 'Shift 1': 0, 'Shift 2': 0, 'Shift 3': 0 }));
+                    let constraintViolated = false;
+                    employees.forEach((emp, empIdx) => {
+                        let prev = null;
+                        let workStreak = 0;
+                        for (let day = 0; day < daysInMonth; day++) {
+                            // Check if this day is a requested shift
+                            let req = (emp.requestedShifts || []).find(r => {
+                                const d = new Date(r.date);
+                                return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day + 1;
+                            });
+                            // Check two days ago for Shift 3
+                            let twoDaysAgo = day >= 2 ? (scheduleMatrix[empIdx][day-2]?.text) : null;
+                            // Count consecutive workdays up to yesterday
+                            let streak = 0;
+                            for (let back = day-1; back >= 0 && scheduleMatrix[empIdx][back] && scheduleMatrix[empIdx][back].text !== 'Off'; back--) {
+                                streak++;
+                            }
+                            if (req) {
+                                // Check shift progression
+                                let valid = false;
+                                if (req.shift === 'Shift 1' && (prev === null || prev === 'Shift 1' || prev === 'Off')) valid = true;
+                                if (req.shift === 'Shift 2' && (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Off')) valid = true;
+                                if (req.shift === 'Shift 3' && (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Shift 3' || prev === 'Off')) valid = true;
+                                // Constraint 1: No more than 5 consecutive workdays
+                                if (streak >= 5 && req.shift !== 'Off') valid = false;
+                                // Constraint 2: If two days ago was Shift 3, today cannot be Shift 1
+                                if (twoDaysAgo === 'Shift 3' && req.shift === 'Shift 1') valid = false;
+                                if (!valid) {
+                                    constraintViolated = true;
+                                    break;
+                                }
+                                scheduleMatrix[empIdx][day] = { text: req.shift, class: 'shift-' + req.shift.split(' ')[1], locked: true };
+                                prev = req.shift;
+                            } else {
+                                prev = scheduleMatrix[empIdx][day] ? scheduleMatrix[empIdx][day].text : prev;
+                            }
+                        }
+                    });
+                    if (constraintViolated) continue;
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        let eligible = employees.map((emp, idx) => {
+                            let prev = null;
+                            if (day > 1) {
+                                const prevCell = scheduleMatrix[idx][day-2];
+                                prev = prevCell ? prevCell.text : null;
+                            }
+                            // Count consecutive workdays up to yesterday
+                            let streak = 0;
+                            for (let back = day-2; back >= 0 && scheduleMatrix[idx][back] && scheduleMatrix[idx][back].text !== 'Off'; back--) {
+                                streak++;
+                            }
+                            // Check two days ago for Shift 3
+                            let twoDaysAgo = day > 2 ? (scheduleMatrix[idx][day-3]?.text) : null;
+                            // Add leave check
+                            const leave = isLeave(employees[idx], dateString);
+                            return {
+                                ...emp,
+                                idx,
+                                prev,
+                                off: isOffDay(emp, dateString),
+                                leave: leave,
+                                streak,
+                                twoDaysAgo
+                            };
+                        });
+                        // Mark leave days in the matrix
+                        eligible.forEach(e => {
+                            if (e.leave) {
+                                scheduleMatrix[e.idx][day-1] = { text: 'Leave', class: '' };
+                            }
+                        });
+                        // Mark off days in the matrix
+                        eligible.forEach(e => {
+                            if (!e.leave && e.off) {
+                                scheduleMatrix[e.idx][day-1] = { text: 'Off', class: 'off requested-off' };
+                            }
+                        });
+                        let assignedIdx = new Set();
+                        shiftTypes.forEach(shift => {
+                            let candidates = eligible.filter(e => {
+                                if (e.leave || e.off) return false;
+                                if (scheduleMatrix[e.idx][day-1] && scheduleMatrix[e.idx][day-1].locked) return false;
+                                if (scheduleMatrix[e.idx][day-1] && scheduleMatrix[e.idx][day-1].text) return false;
+                                // Constraint 1: No more than 5 consecutive workdays
+                                if (e.streak >= 5 && shift.name !== 'Off') return false;
+                                // Constraint 2: If two days ago was Shift 3, today cannot be Shift 1
+                                if (e.twoDaysAgo === 'Shift 3' && shift.name === 'Shift 1') return false;
+                                if (shift.name === 'Shift 1' && (e.prev === null || e.prev === 'Shift 1' || e.prev === 'Off')) return true;
+                                if (shift.name === 'Shift 2' && (e.prev === null || e.prev === 'Shift 1' || e.prev === 'Shift 2' || e.prev === 'Off')) return true;
+                                if (shift.name === 'Shift 3' && (e.prev === null || e.prev === 'Shift 1' || e.prev === 'Shift 2' || e.prev === 'Shift 3' || e.prev === 'Off')) return true;
+                                return false;
+                            });
+                            if (candidates.length > 0) {
+                                candidates.sort((a, b) => shiftCounts[a.idx][shift.name] - shiftCounts[b.idx][shift.name]);
+                                let minCount = shiftCounts[candidates[0].idx][shift.name];
+                                let tied = candidates.filter(e => shiftCounts[e.idx][shift.name] === minCount);
+                                let emp = tied[Math.floor(Math.random() * tied.length)];
+                                scheduleMatrix[emp.idx][day-1] = { text: shift.name, class: shift.class };
+                                prevShifts[emp.idx] = shift.name;
+                                shiftCounts[emp.idx][shift.name]++;
+                                assignedIdx.add(emp.idx);
+                            }
+                        });
+                        eligible.forEach(e => {
+                            if (!e.leave && !e.off && (!scheduleMatrix[e.idx][day-1] || scheduleMatrix[e.idx][day-1].text === '')) {
+                                scheduleMatrix[e.idx][day-1] = { text: 'Off', class: 'off' };
+                                prevShifts[e.idx] = 'Off';
+                            }
+                        });
+                    }
+                    validSchedule = true;
+                    employees.forEach((emp, empIdx) => {
+                        let prev = null;
+                        let workStreak = 0;
+                        for (let day = 0; day < daysInMonth; day++) {
+                            let req = (emp.requestedShifts || []).find(r => {
+                                const d = new Date(r.date);
+                                return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day + 1;
+                            });
+                            let twoDaysAgo = day >= 2 ? (scheduleMatrix[empIdx][day-2]?.text) : null;
+                            let streak = 0;
+                            for (let back = day-1; back >= 0 && scheduleMatrix[empIdx][back] && scheduleMatrix[empIdx][back].text !== 'Off'; back--) {
+                                streak++;
+                            }
+                            if (req) {
+                                let valid = false;
+                                if (req.shift === 'Shift 1' && (prev === null || prev === 'Shift 1' || prev === 'Off')) valid = true;
+                                if (req.shift === 'Shift 2' && (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Off')) valid = true;
+                                if (req.shift === 'Shift 3' && (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Shift 3' || prev === 'Off')) valid = true;
+                                if (streak >= 5 && req.shift !== 'Off') valid = false;
+                                if (twoDaysAgo === 'Shift 3' && req.shift === 'Shift 1') valid = false;
+                                if (!valid || scheduleMatrix[empIdx][day].text !== req.shift) {
+                                    validSchedule = false;
+                                    break;
+                                }
+                                prev = req.shift;
+                            } else {
+                                prev = scheduleMatrix[empIdx][day] ? scheduleMatrix[empIdx][day].text : prev;
+                            }
+                        }
+                    });
+                }
+                if (!validSchedule) {
+                    alert('Could not generate a valid schedule that honors all requested shifts and constraints. Please adjust your requests.');
+                    return;
+                }
+                // Render the schedule
+            employees.forEach((employee, empIndex) => {
+                const row = document.createElement('tr');
+                const nameCell = document.createElement('td');
+                nameCell.textContent = employee.name;
+                nameCell.style.fontWeight = 'bold';
+                nameCell.style.background = '#f8fafc';
+                row.appendChild(nameCell);
+                    // Dynamic shift counters
+                    let shiftCounts = { 'Shift 1': 0, 'Shift 2': 0, 'Shift 3': 0 };
+                    let offCount = 0;
+                    let workdayCount = 0;
+                    let leaveCount = 0;
+                    for (let day = 0; day < daysInMonth; day++) {
+                    const cell = document.createElement('td');
+                        const entry = scheduleMatrix[empIndex][day];
+                        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day+1).padStart(2, '0')}`;
+                        const isHoliday = isPublicHoliday(dateString);
+                        const isLeaveDay = isLeave(employee, dateString);
+                        let cellValue = (entry ? entry.text : '');
+                        // Mark leave days in the cell
+                        if (isLeaveDay) {
+                            cellValue = 'Leave';
+                        }
+                        cell.textContent = cellValue;
+                        // Set class and style for leave
+                        if (isLeaveDay) {
+                            cell.className = '';
+                            cell.style.background = '#ffe4b2';
+                            cell.style.color = '#b7791f';
+                        } else {
+                            cell.className = entry ? entry.class : '';
+                            cell.style.whiteSpace = 'nowrap';
+                            cell.style.overflow = '';
+                            cell.style.textOverflow = '';
+                            cell.style.maxWidth = '';
+                            cell.style.lineHeight = '1.2';
+                        }
+                        if (cellValue === 'Leave') {
+                            // Already styled above
+                            leaveCount++;
+                        } else if (cellValue === 'Off' && entry && entry.class && entry.class.includes('requested-off')) {
+                            cell.style.fontWeight = 'bold';
+                            cell.style.color = '#e53e3e';
+                            offCount++;
+                        } else if (cellValue === 'Off') {
+                            offCount++;
+                        } else if (cellValue.startsWith('Shift')) {
+                            shiftCounts[cellValue]++;
+                        }
+
+                        // For workday count: only count as workday if not a holiday
+                        if (!isHoliday && !isLeaveDay && cellValue.startsWith('Shift')) {
+                            workdayCount++;
+                        }
+
+                        if (isHoliday) {
+                            cell.title = getHolidayName(dateString);
+                        }
+                        // Remove cell click event for editing
+                        // cell.style.cursor = 'pointer';
+                        // cell.addEventListener('click', function(e) { ... });
+                    row.appendChild(cell);
+                }
+                    // Add dynamic summary cells for each shift
+                    shiftTypes.forEach(shift => {
+                        const shiftCell = document.createElement('td');
+                        shiftCell.textContent = shiftCounts[shift.name];
+                        shiftCell.style.fontWeight = 'bold';
+                        shiftCell.style.background = '#f8fafc';
+                        row.appendChild(shiftCell);
+                    });
+                    // Add total workdays cell
+                    const totalWorkdaysCell = document.createElement('td');
+                    const totalWorkdays = shiftCounts['Shift 1'] + shiftCounts['Shift 2'] + shiftCounts['Shift 3'];
+                    totalWorkdaysCell.textContent = totalWorkdays;
+                    totalWorkdaysCell.style.fontWeight = 'bold';
+                    totalWorkdaysCell.style.background = '#f8fafc';
+                    row.appendChild(totalWorkdaysCell);
+                    // Add total off cell
+                    const totalOffCell = document.createElement('td');
+                    totalOffCell.textContent = offCount + leaveCount;
+                    totalOffCell.style.fontWeight = 'bold';
+                    totalOffCell.style.background = '#f8fafc';
+                    row.appendChild(totalOffCell);
+                    // Add min workdays cell
+                    const minWorkdaysCell = document.createElement('td');
+                    const numWeekdayHolidays = countWeekdayHolidaysInMonth(year, month, indonesianHolidays);
+                    const numWeekdays = countWeekdaysInMonth(year, month);
+                    // Subtract leave days from minWorkdays
+                    const leaveDays = countLeaveDaysInMonth(employee, year, month);
+                    const minWorkdays = numWeekdays - numWeekdayHolidays - 1 - leaveDays;
+                    minWorkdaysCell.textContent = minWorkdays;
+                    minWorkdaysCell.style.fontWeight = 'bold';
+                    minWorkdaysCell.style.background = '#f8fafc';
+                    row.appendChild(minWorkdaysCell);
+                    // Add max workdays cell
+                    const maxWorkdaysCell = document.createElement('td');
+                    const maxWorkdaysBase = numWeekdays - numWeekdayHolidays + 1;
+                    maxWorkdaysCell.textContent = maxWorkdaysBase;
+                    maxWorkdaysCell.style.fontWeight = 'bold';
+                    maxWorkdaysCell.style.background = '#f8fafc';
+                    row.appendChild(maxWorkdaysCell);
+                tbody.appendChild(row);
+            });
+            table.style.display = 'table';
+            // Add legend
+            addScheduleLegend();
+                document.getElementById('loadingIndicator').style.display = 'none';
+                document.getElementById('scheduleTable').style.display = 'table';
+            }, 50);
+        }
+        
+        function addScheduleLegend() {
+            // Remove existing legend
+            const existingLegend = document.querySelector('.schedule-legend');
+            if (existingLegend) {
+                existingLegend.remove();
+            }
+            
+            const legend = document.createElement('div');
+            legend.className = 'schedule-legend';
+            legend.style.marginTop = '20px';
+            legend.style.padding = '15px';
+            legend.style.background = '#f8fafc';
+            legend.style.borderRadius = '10px';
+            legend.style.border = '1px solid #e2e8f0';
+            
+            legend.innerHTML = `
+                <h4 style="margin-bottom: 10px; color: #4a5568;">Legend:</h4>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <span style="padding: 5px 10px; background: rgba(240, 147, 251, 0.2); border-radius: 5px;">Shift 1 (07:30 AM - 04:30 PM)</span>
+                    <span style="padding: 5px 10px; background: rgba(79, 172, 254, 0.2); border-radius: 5px;">Shift 2 (04:30 PM - 12:00 AM)</span>
+                    <span style="padding: 5px 10px; background: rgba(67, 233, 123, 0.2); border-radius: 5px;">Shift 3 (12:00 AM - 07:30 AM)</span>
+                    <span style="padding: 5px 10px; background: rgba(160, 174, 192, 0.2); border-radius: 5px;">Off (Regular)</span>
+                    <span style="padding: 5px 10px; background: rgba(160, 174, 192, 0.2); border-radius: 5px; color: #e53e3e; font-weight: bold;">Off (Requested)</span>
+                </div>
+            `;
+            
+            document.querySelector('.schedule-table').appendChild(legend);
+        }
+        
+        // After the DOM loads, initialize flatpickr for all .off-days-multidate inputs
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.off-days-multidate').forEach(input => {
+                flatpickr(input, { mode: 'multiple' });
+            });
+        });
+    </script>
+</body>
+</html>
