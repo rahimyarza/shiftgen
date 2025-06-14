@@ -300,20 +300,16 @@
 
         let indonesianHolidays = [];
         async function fetchIndonesianHolidays(year) {
-            const apiKey = 'wgQIVG4UB8LJ3NlROy2YsWQRlaQt8530'; // Calendarific API key
-            const url = `https://calendarific.com/api/v2/holidays?&api_key=${apiKey}&country=ID&year=${year}`;
             try {
-                const response = await fetch(url);
+                const response = await fetch(`https://libur.deno.dev/api?year=${year}`);
                 if (!response.ok) return [];
                 const data = await response.json();
-                // Filter for public and joint holidays
-                return data.response.holidays
-                    .filter(h => h.type.includes('National holiday') || h.type.includes('Public holiday') || h.type.includes('Government holiday') || h.type.includes('Joint Holiday'))
-                    .map(h => ({
-                        date: h.date.iso.slice(0, 10),
-                        localName: h.name
-                    }));
+                return data.map(h => ({
+                    date: h.date,
+                    localName: h.name
+                }));
             } catch (e) {
+                console.error('Error fetching holidays:', e);
                 return [];
             }
         }
@@ -722,6 +718,180 @@
                     alert('Could not generate a valid schedule that honors all requested shifts and constraints. Please adjust your requests.');
                     return;
                 }
+
+                // Check and adjust workdays to meet minimum requirements
+                employees.forEach((employee, empIndex) => {
+                    // Calculate current workdays
+                    let currentWorkdays = 0;
+                    for (let day = 0; day < daysInMonth; day++) {
+                        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day+1).padStart(2, '0')}`;
+                        const isHoliday = isPublicHoliday(dateString);
+                        const isLeaveDay = isLeave(employee, dateString);
+                        const entry = scheduleMatrix[empIndex][day];
+                        
+                        if (!isHoliday && !isLeaveDay && entry && entry.text.startsWith('Shift')) {
+                            currentWorkdays++;
+                        }
+                    }
+
+                    // Calculate minimum required workdays
+                    const numWeekdayHolidays = countWeekdayHolidaysInMonth(year, month, indonesianHolidays);
+                    const numWeekdays = countWeekdaysInMonth(year, month);
+                    const leaveDays = countLeaveDaysInMonth(employee, year, month);
+                    const minWorkdays = numWeekdays - numWeekdayHolidays - 1 - leaveDays;
+
+                    // If current workdays is less than minimum, try to convert some off days to shifts
+                    if (currentWorkdays < minWorkdays) {
+                        const neededWorkdays = minWorkdays - currentWorkdays;
+                        let converted = 0;
+
+                        // Try to convert off days to shifts, prioritizing regular off days over requested off days
+                        for (let day = 0; day < daysInMonth && converted < neededWorkdays; day++) {
+                            const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day+1).padStart(2, '0')}`;
+                            const isHoliday = isPublicHoliday(dateString);
+                            const isLeaveDay = isLeave(employee, dateString);
+                            const entry = scheduleMatrix[empIndex][day];
+
+                            // Skip if it's a holiday, leave day, or already a shift
+                            if (isHoliday || isLeaveDay || (entry && entry.text.startsWith('Shift'))) {
+                                console.log(`[${employee.name}] Day ${day+1}: Skip (holiday/leave/already shift)`);
+                                continue;
+                            }
+
+                            // Skip if it's a requested off day
+                            if (entry && entry.class && entry.class.includes('requested-off')) {
+                                console.log(`[${employee.name}] Day ${day+1}: Skip (requested off)`);
+                                continue;
+                            }
+
+                            // Helper: count how many employees are already assigned to a shift on this day
+                            function countEmployeesForShift(shiftName) {
+                                let count = 0;
+                                for (let e = 0; e < employees.length; e++) {
+                                    if (scheduleMatrix[e][day] && scheduleMatrix[e][day].text === shiftName) count++;
+                                }
+                                return count;
+                            }
+
+                            // Helper: check streaks before and after assignment
+                            function wouldExceedStreak(candidateShift) {
+                                // Simulate assignment
+                                let streak = 0;
+                                // Count backward
+                                for (let back = day-1; back >= 0 && scheduleMatrix[empIndex][back] && scheduleMatrix[empIndex][back].text !== 'Off'; back--) {
+                                    if (scheduleMatrix[empIndex][back].text.startsWith('Shift')) streak++;
+                                    else break;
+                                }
+                                if (candidateShift.startsWith('Shift')) streak++;
+                                // Count forward
+                                for (let fwd = day+1; fwd < daysInMonth && scheduleMatrix[empIndex][fwd] && scheduleMatrix[empIndex][fwd].text.startsWith('Shift'); fwd++) {
+                                    streak++;
+                                }
+                                return streak > 5;
+                            }
+
+                            // Helper: check Shift 3 → (any) → Shift 1 in both directions
+                            function violatesShift3To1(candidateShift) {
+                                // If assigning Shift 1, check two days ago
+                                if (candidateShift === 'Shift 1') {
+                                    let twoDaysAgo = day > 1 ? scheduleMatrix[empIndex][day-2]?.text : null;
+                                    if (twoDaysAgo === 'Shift 3') return true;
+                                }
+                                // If assigning Shift 3, check two days later
+                                if (candidateShift === 'Shift 3') {
+                                    let twoDaysLater = day < daysInMonth - 2 ? scheduleMatrix[empIndex][day+2]?.text : null;
+                                    if (twoDaysLater === 'Shift 1') return true;
+                                }
+                                // If two days ago was Shift 3 and today is Shift 1
+                                // If two days later will be Shift 1 and today is Shift 3
+                                return false;
+                            }
+
+                            let assigned = false;
+                            // Try Shift 1
+                            if (!assigned && countEmployeesForShift('Shift 1') < 2 && !wouldExceedStreak('Shift 1') && !violatesShift3To1('Shift 1')) {
+                                // Check next day constraint as before
+                                let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
+                                let twoDaysAgo = day > 1 ? scheduleMatrix[empIndex][day-2]?.text : null;
+                                let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Off') && twoDaysAgo !== 'Shift 3';
+                                // Check next day for valid progression
+                                let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
+                                if (canAssign) {
+                                    if (nextDayAssigned && nextDayAssigned.startsWith('Shift') && !(nextDayAssigned === 'Shift 1' || nextDayAssigned === 'Shift 2' || nextDayAssigned === 'Off')) {
+                                        console.log(`[${employee.name}] Day ${day+1}: Cannot assign Shift 1 because next day is ${nextDayAssigned}, which is not valid after Shift 1`);
+                                    } else {
+                                        scheduleMatrix[empIndex][day] = { text: 'Shift 1', class: 'shift-1' };
+                                        assigned = true;
+                                        console.log(`[${employee.name}] Day ${day+1}: Assigned Shift 1`);
+                                    }
+                                }
+                            }
+                            // Try Shift 2
+                            if (!assigned && countEmployeesForShift('Shift 2') < 2 && !wouldExceedStreak('Shift 2') && !violatesShift3To1('Shift 2')) {
+                                let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
+                                let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Off') && prev !== 'Shift 3';
+                                let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
+                                if (canAssign) {
+                                    if (nextDayAssigned && nextDayAssigned.startsWith('Shift') && !(nextDayAssigned === 'Shift 2' || nextDayAssigned === 'Shift 3' || nextDayAssigned === 'Off')) {
+                                        console.log(`[${employee.name}] Day ${day+1}: Cannot assign Shift 2 because next day is ${nextDayAssigned}, which is not valid after Shift 2`);
+                                    } else {
+                                        scheduleMatrix[empIndex][day] = { text: 'Shift 2', class: 'shift-2' };
+                                        assigned = true;
+                                        console.log(`[${employee.name}] Day ${day+1}: Assigned Shift 2`);
+                                    }
+                                }
+                            }
+                            // Try Shift 3
+                            if (!assigned && countEmployeesForShift('Shift 3') < 2 && !wouldExceedStreak('Shift 3') && !violatesShift3To1('Shift 3')) {
+                                let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
+                                let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Shift 3' || prev === 'Off');
+                                let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
+                                if (canAssign) {
+                                    if (nextDayAssigned && nextDayAssigned.startsWith('Shift') && !(nextDayAssigned === 'Shift 3' || nextDayAssigned === 'Off')) {
+                                        console.log(`[${employee.name}] Day ${day+1}: Cannot assign Shift 3 because next day is ${nextDayAssigned}, which is not valid after Shift 3`);
+                                    } else {
+                                        scheduleMatrix[empIndex][day] = { text: 'Shift 3', class: 'shift-3' };
+                                        assigned = true;
+                                        console.log(`[${employee.name}] Day ${day+1}: Assigned Shift 3`);
+                                    }
+                                }
+                            }
+                            if (assigned) {
+                                converted++;
+                            } else {
+                                console.log(`[${employee.name}] Day ${day+1}: No valid shift could be assigned.`);
+                            }
+                        }
+                    }
+                });
+
+                // After adjustment, check if all employees meet their minimum workdays
+                let allMeetMinWorkdays = true;
+                employees.forEach((employee, empIndex) => {
+                    // Recalculate current workdays
+                    let currentWorkdays = 0;
+                    for (let day = 0; day < daysInMonth; day++) {
+                        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day+1).padStart(2, '0')}`;
+                        const isHoliday = isPublicHoliday(dateString);
+                        const isLeaveDay = isLeave(employee, dateString);
+                        const entry = scheduleMatrix[empIndex][day];
+                        if (!isHoliday && !isLeaveDay && entry && entry.text.startsWith('Shift')) {
+                            currentWorkdays++;
+                        }
+                    }
+                    const numWeekdayHolidays = countWeekdayHolidaysInMonth(year, month, indonesianHolidays);
+                    const numWeekdays = countWeekdaysInMonth(year, month);
+                    const leaveDays = countLeaveDaysInMonth(employee, year, month);
+                    const minWorkdays = numWeekdays - numWeekdayHolidays - 1 - leaveDays;
+                    if (currentWorkdays < minWorkdays) {
+                        allMeetMinWorkdays = false;
+                        console.log(`[${employee.name}] did not meet min workdays: ${currentWorkdays} < ${minWorkdays}`);
+                    }
+                });
+                if (!allMeetMinWorkdays) {
+                    validSchedule = false;
+                }
+
                 // Render the schedule
             employees.forEach((employee, empIndex) => {
                 const row = document.createElement('tr');
