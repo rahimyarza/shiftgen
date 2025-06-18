@@ -343,7 +343,6 @@
                         <option value="Shift 2">Last: Shift 2</option>
                         <option value="Shift 3">Last: Shift 3</option>
                         <option value="Off">Last: Off</option>
-                        <option value="Leave">Last: Leave</option>
                     </select>
                     <input type="text" class="off-days-multidate" placeholder="Days off" style="width:140px; font-size:13px; padding:4px 8px; margin-left:8px; margin-bottom:2px;" readonly>
                     <input type="text" class="leave-range" placeholder="Leave (range)" style="width:140px; font-size:13px; padding:4px 8px; margin-left:8px; margin-bottom:2px;" readonly>
@@ -545,6 +544,11 @@
                     th.style.minWidth = '40px';
                     thead.appendChild(th);
                 });
+                // Add total evening/night shifts column
+                const thEveningNightTotal = document.createElement('th');
+                thEveningNightTotal.textContent = 'S2+S3 Total';
+                thEveningNightTotal.style.minWidth = '40px';
+                thead.appendChild(thEveningNightTotal);
                 const thTotalWorkdays = document.createElement('th');
                 thTotalWorkdays.textContent = 'Total Workdays';
                 thTotalWorkdays.style.minWidth = '40px';
@@ -617,6 +621,9 @@
                             if (day > 1) {
                                 const prevCell = scheduleMatrix[idx][day-2];
                                 prev = prevCell ? prevCell.text : null;
+                            } else {
+                                // Use lastShift from employee data for the first day
+                                prev = emp.lastShift || null;
                             }
                             // Count consecutive workdays up to yesterday
                             let streak = 0;
@@ -761,18 +768,38 @@
                             // Helper: count how many employees are already assigned to a shift on this day
                             const countEmployeesForShift = shiftName => employees.reduce((count, _, e) => count + (scheduleMatrix[e][day] && scheduleMatrix[e][day].text === shiftName ? 1 : 0), 0);
 
-                            // Helper: check streaks before and after assignment
-                            const wouldExceedStreak = candidateShift => {
+                            // Helper: check general work streak (for all shifts)
+                            const wouldExceedGeneralStreak = candidateShift => {
                                 let streak = 0;
+                                // Count backward streak
                                 for (let back = day-1; back >= 0 && scheduleMatrix[empIndex][back] && scheduleMatrix[empIndex][back].text !== 'Off'; back--) {
                                     if (scheduleMatrix[empIndex][back].text.startsWith('Shift')) streak++;
                                     else break;
                                 }
+                                // Add current day if it's a shift
                                 if (candidateShift.startsWith('Shift')) streak++;
+                                // Count forward streak
                                 for (let fwd = day+1; fwd < daysInMonth && scheduleMatrix[empIndex][fwd] && scheduleMatrix[empIndex][fwd].text.startsWith('Shift'); fwd++) {
                                     streak++;
                                 }
                                 return streak > 5;
+                            };
+
+                            // Helper: check Shift 3 specific streak
+                            const wouldExceedShift3Streak = () => {
+                                let shift3Streak = 0;
+                                // Count backward Shift 3 streak
+                                for (let back = day-1; back >= 0 && scheduleMatrix[empIndex][back] && scheduleMatrix[empIndex][back].text !== 'Off'; back--) {
+                                    if (scheduleMatrix[empIndex][back].text === 'Shift 3') shift3Streak++;
+                                    else break;
+                                }
+                                // Add current day if it's Shift 3
+                                shift3Streak++;
+                                // Count forward Shift 3 streak
+                                for (let fwd = day+1; fwd < daysInMonth && scheduleMatrix[empIndex][fwd] && scheduleMatrix[empIndex][fwd].text === 'Shift 3'; fwd++) {
+                                    shift3Streak++;
+                                }
+                                return shift3Streak > 3;
                             };
 
                             // Helper: check Shift 3 → (any) → Shift 1 in both directions
@@ -789,19 +816,8 @@
                             };
 
                             let assigned = false;
-                            // Try Shift 1
-                            if (!assigned && countEmployeesForShift('Shift 1') < 2 && !wouldExceedStreak('Shift 1') && !violatesShift3To1('Shift 1')) {
-                                let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
-                                let twoDaysAgo = day > 1 ? scheduleMatrix[empIndex][day-2]?.text : null;
-                                let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Off') && twoDaysAgo !== 'Shift 3';
-                                let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
-                                if (canAssign && (!nextDayAssigned || !nextDayAssigned.startsWith('Shift') || nextDayAssigned === 'Shift 1' || nextDayAssigned === 'Shift 2' || nextDayAssigned === 'Off')) {
-                                    scheduleMatrix[empIndex][day] = { text: 'Shift 1', class: 'shift-1' };
-                                    assigned = true;
-                                }
-                            }
                             // Try Shift 2
-                            if (!assigned && countEmployeesForShift('Shift 2') < 2 && !wouldExceedStreak('Shift 2') && !violatesShift3To1('Shift 2')) {
+                            if (!assigned && countEmployeesForShift('Shift 2') < 2 && !wouldExceedGeneralStreak('Shift 2') && !violatesShift3To1('Shift 2')) {
                                 let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
                                 let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Off') && prev !== 'Shift 3';
                                 let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
@@ -811,7 +827,7 @@
                                 }
                             }
                             // Try Shift 3
-                            if (!assigned && countEmployeesForShift('Shift 3') < 2 && !wouldExceedStreak('Shift 3') && !violatesShift3To1('Shift 3')) {
+                            if (!assigned && countEmployeesForShift('Shift 3') < 2 && !wouldExceedGeneralStreak('Shift 3') && !wouldExceedShift3Streak() && !violatesShift3To1('Shift 3')) {
                                 let prev = day > 0 ? scheduleMatrix[empIndex][day-1]?.text : (employees[empIndex].lastShift || null);
                                 let canAssign = (prev === null || prev === 'Shift 1' || prev === 'Shift 2' || prev === 'Shift 3' || prev === 'Off');
                                 let nextDayAssigned = day < daysInMonth - 1 ? scheduleMatrix[empIndex][day+1]?.text : null;
@@ -923,6 +939,13 @@
                         shiftCell.style.background = '#f8fafc';
                         row.appendChild(shiftCell);
                     });
+                    // Add evening/night shifts total cell
+                    const eveningNightTotalCell = document.createElement('td');
+                    const eveningNightTotal = shiftCounts['Shift 2'] + shiftCounts['Shift 3'];
+                    eveningNightTotalCell.textContent = eveningNightTotal;
+                    eveningNightTotalCell.style.fontWeight = 'bold';
+                    eveningNightTotalCell.style.background = '#f8fafc';
+                    row.appendChild(eveningNightTotalCell);
                     // Add total workdays cell
                     const totalWorkdaysCell = document.createElement('td');
                     const totalWorkdays = shiftCounts['Shift 1'] + shiftCounts['Shift 2'] + shiftCounts['Shift 3'];
